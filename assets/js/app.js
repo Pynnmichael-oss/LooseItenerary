@@ -10,13 +10,10 @@
 
 'use strict';
 
-/* ── Constants ── */
-const SEED_FLAG        = 'loose_itinerary_seeded';
-const MAPBOX_TOKEN_KEY = 'li_mapbox_token';
-const ANTHROPIC_KEY    = 'li_anthropic_key';
-const SUPABASE_URL_KEY = 'li_supabase_url';
-const SUPABASE_KEY_KEY = 'li_supabase_anon_key';
-const TRIPS_PAGE       = 'trips/index.html';
+/* ── Constants (MAPBOX_TOKEN_KEY, TRIPS_PAGE defined in globe.js;
+   SUPABASE_URL_KEY, SUPABASE_KEY_KEY defined in supabase.js) ── */
+const SEED_FLAG    = 'loose_itinerary_seeded';
+const ANTHROPIC_KEY = 'li_anthropic_key';
 
 /* ── Vibe tag presets ── */
 const PRESET_VIBE_TAGS = [
