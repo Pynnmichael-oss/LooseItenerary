@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f0f">
+
+  <!-- PWA -->
+  <link rel="manifest" href="../manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <title>Trip — Loose Itinerary</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/trip.css">
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body class="trip-page">
+
+  <!-- Navigation -->
+  <nav class="nav" aria-label="Site navigation">
+    <a href="../index.html" class="site-logo">Loose Itinerary</a>
+    <div class="nav-links">
+      <a href="../index.html#globe" class="nav-link">Globe</a>
+      <a href="../index.html#trips" class="nav-link">Trips</a>
+    </div>
+  </nav>
+
+  <!-- Main content — rendered by JS -->
+  <main id="trip-content">
+    <!-- Loading state -->
+    <div id="trip-loading" style="
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: var(--space-4);
+      color: var(--text-muted);
+    ">
+      <div class="spinner"></div>
+      <span style="font-family: var(--font-heading); font-style: italic; font-size: var(--text-xl);">
+        Loading…
+      </span>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="../assets/js/supabase.js"></script>
+  <script src="../assets/js/storage.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+
+  <script>
+    /* ============================================================
+       TRIP PAGE — Hash-routed client-side rendering
+       URL: trips/index.html#[slug]
+       ============================================================ */
+
+    'use strict';
+
+    // ── Init ──────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadTrip();
+    });
+
+    window.addEventListener('hashchange', () => {
+      loadTrip();
+    });
+
+    // ── Load and render ───────────────────────────────────────
+
+    async function loadTrip() {
+      const slug = window.location.hash.replace('#', '').trim();
+      const content = document.getElementById('trip-content');
+
+      if (!slug) {
+        renderNotFound(content);
+        return;
+      }
+
+      // Show loading
+      content.innerHTML = `
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 60vh;
+          gap: var(--space-4);
+          color: var(--text-muted);
+        ">
+          <div class="spinner"></div>
+          <span style="font-family: var(--font-heading); font-style: italic; font-size: var(--text-xl);">
+            Loading…
+          </span>
+        </div>
+      `;
+
+      // Check Supabase configured
+      if (!isConfigured()) {
+        renderNotConfigured(content);
+        return;
+      }
+
+      try {
+        const { data: trip, error } = await getTrip(slug);
+        if (error || !trip) {
+          renderNotFound(content);
+          return;
+        }
+
+        // Fetch photos
+        const { data: photos } = await getPhotos(trip.id);
+
+        renderTrip(content, trip, photos || []);
+      } catch (err) {
+        console.error('[Trip] Load error:', err);
+        renderNotFound(content);
+      }
+    }
+
+    // ── Render trip ───────────────────────────────────────────
+
+    function renderTrip(container, trip, photos) {
+      // Update page title
+      document.title = `${trip.destination} — Loose Itinerary`;
+
+      const accent = trip.accent_color || '#c4732a';
+      const dateStr = formatDateRange(trip.start_date, trip.end_date);
+      const nights  = calcNights(trip.start_date, trip.end_date);
+
+      // Hero image or gradient
+      const heroContent = trip.cover_photo_url
+        ? `<img class="trip-hero-image" src="${trip.cover_photo_url}" alt="${trip.destination}">`
+        : `<div class="trip-hero-placeholder" style="background: linear-gradient(135deg, ${hexAdjust(accent, -30)} 0%, ${accent} 60%, ${hexAdjust(accent, 20)} 100%);">${trip.destination.charAt(0)}</div>`;
+
+      // Vibe tags
+      const tagHtml = (trip.vibe_tags || []).map(t =>
+        `<span class="vibe-tag">${t}</span>`
+      ).join('');
+
+      // Days
+      const daysHtml = (trip.days || []).length > 0
+        ? renderDays(trip.days)
+        : '';
+
+      // Highlights
+      const highlightsHtml = (trip.highlights || []).length > 0
+        ? renderHighlights(trip.highlights)
+        : '';
+
+      // Tips
+      const tipsHtml = (trip.tips || []).length > 0
+        ? renderTips(trip.tips)
+        : '';
+
+      // Photos
+      const photosHtml = photos.length > 0
+        ? renderPhotos(photos)
+        : '';
+
+      // Cities
+      const citiesHtml = (trip.cities || []).map(c =>
+        `<div class="city-item"><span class="city-bullet"></span>${c}</div>`
+      ).join('');
+
+      container.innerHTML = `
+        <!-- Hero -->
+        <div class="trip-hero">
+          ${heroContent}
+          <div class="trip-hero-overlay"></div>
+          <div class="trip-hero-content">
+            <a href="../index.html#trips" class="trip-back-link">
+              <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8.5 2L3.5 7L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              All Trips
+            </a>
+            <h1 class="trip-destination">${trip.destination}</h1>
+            ${trip.tagline ? `<p class="trip-tagline">${trip.tagline}</p>` : ''}
+            <div class="trip-meta-row">
+              ${dateStr ? `<span class="trip-meta-item">${dateStr}</span>` : ''}
+              ${nights > 0 ? `<span class="trip-meta-item">${nights} night${nights !== 1 ? 's' : ''}</span>` : ''}
+              ${tagHtml ? `<div class="vibe-tags">${tagHtml}</div>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="trip-body">
+          <div class="trip-content-grid">
+
+            <!-- Main column -->
+            <div>
+
+              <!-- Photos -->
+              ${photosHtml ? `
+              <div class="trip-section photos-section fade-in">
+                <h2 class="trip-section-heading">Photos</h2>
+                <div class="photos-grid">${photosHtml}</div>
+              </div>` : ''}
+
+              <!-- Highlights -->
+              ${highlightsHtml ? `
+              <div class="trip-section fade-in">
+                <h2 class="trip-section-heading">Highlights</h2>
+                <div class="highlights-list">${highlightsHtml}</div>
+              </div>` : ''}
+
+              <!-- Day by Day -->
+              ${daysHtml ? `
+              <div class="trip-section fade-in">
+                <h2 class="trip-section-heading">Day by Day</h2>
+                <div class="days-list">${daysHtml}</div>
+              </div>` : ''}
+
+              <!-- Tips -->
+              ${tipsHtml ? `
+              <div class="trip-section fade-in">
+                <h2 class="trip-section-heading">Tips for Next Time</h2>
+                <div class="tips-list">${tipsHtml}</div>
+              </div>` : ''}
+
+              <!-- Empty state if no content at all -->
+              ${!highlightsHtml && !daysHtml && !tipsHtml && !photosHtml ? `
+              <div class="trip-section fade-in" style="padding: var(--space-16) 0;">
+                <p style="
+                  font-family: var(--font-heading);
+                  font-style: italic;
+                  font-size: var(--text-2xl);
+                  color: var(--text-muted);
+                  font-weight: 300;
+                ">The story is still being written.</p>
+              </div>` : ''}
+
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="trip-sidebar">
+
+              <!-- Stats -->
+              ${(trip.cash_spent || trip.points_used || nights > 0) ? `
+              <div class="sidebar-card fade-in">
+                <h3 class="sidebar-card-title">The Numbers</h3>
+                <div class="stats-grid">
+                  ${nights > 0 ? `
+                  <div class="stat-item">
+                    <div class="stat-value">${nights}</div>
+                    <div class="stat-label">Nights</div>
+                  </div>` : ''}
+                  ${trip.cash_spent ? `
+                  <div class="stat-item">
+                    <div class="stat-value">$${Number(trip.cash_spent).toLocaleString()}</div>
+                    <div class="stat-label">Cash</div>
+                  </div>` : ''}
+                  ${trip.points_used ? `
+                  <div class="stat-item">
+                    <div class="stat-value">${Number(trip.points_used).toLocaleString()}</div>
+                    <div class="stat-label">Points</div>
+                  </div>` : ''}
+                  ${(trip.cities || []).length > 0 ? `
+                  <div class="stat-item">
+                    <div class="stat-value">${trip.cities.length}</div>
+                    <div class="stat-label">Cities</div>
+                  </div>` : ''}
+                </div>
+              </div>` : ''}
+
+              <!-- Cities -->
+              ${(trip.cities || []).length > 0 ? `
+              <div class="sidebar-card fade-in">
+                <h3 class="sidebar-card-title">Cities Visited</h3>
+                <div class="cities-list">${citiesHtml}</div>
+              </div>` : ''}
+
+              <!-- Actions -->
+              <div class="sidebar-card fade-in">
+                <h3 class="sidebar-card-title">Actions</h3>
+                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                  <a href="../index.html#trips" class="btn btn-ghost btn-sm">← Back to All Trips</a>
+                  <button class="btn btn-danger btn-sm" id="delete-trip-btn">Delete Trip</button>
+                </div>
+              </div>
+
+            </aside>
+          </div>
+        </div>
+      `;
+
+      // Wire up delete
+      document.getElementById('delete-trip-btn')?.addEventListener('click', async () => {
+        if (!confirm(`Delete "${trip.destination}"? This cannot be undone.`)) return;
+        const { error } = await deleteTrip(trip.slug);
+        if (!error) {
+          window.location.href = '../index.html#trips';
+        } else {
+          alert('Could not delete trip: ' + error.message);
+        }
+      });
+
+      // Init scroll observer for fade-ins
+      initScrollObserver();
+    }
+
+    // ── Sub-renderers ─────────────────────────────────────────
+
+    function renderDays(days) {
+      return days.map(day => `
+        <div class="day-item">
+          <div class="day-marker">D${day.index + 1}</div>
+          <div class="day-content">
+            ${day.date ? `<div class="day-date">${formatFullDate(day.date)}</div>` : ''}
+            <h3 class="day-title">${day.title}</h3>
+            <p class="day-summary">${day.summary}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderHighlights(highlights) {
+      return highlights.map(h => `
+        <div class="highlight-item">
+          <div class="highlight-dot"></div>
+          <p class="highlight-text">${h}</p>
+        </div>
+      `).join('');
+    }
+
+    function renderTips(tips) {
+      return tips.map(tip => `
+        <div class="tip-item">
+          <span class="tip-icon">→</span>
+          <p class="tip-text">${tip}</p>
+        </div>
+      `).join('');
+    }
+
+    function renderPhotos(photos) {
+      return photos.map(photo => `
+        <div class="photo-item">
+          <img src="${photo.public_url}" alt="${photo.caption || 'Trip photo'}" loading="lazy">
+          ${photo.caption ? `<div class="photo-caption">${photo.caption}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // ── Not found / not configured states ─────────────────────
+
+    function renderNotFound(container) {
+      document.title = 'Trip Not Found — Loose Itinerary';
+      container.innerHTML = `
+        <div class="trip-not-found">
+          <p class="trip-not-found-text">
+            This journey hasn't been documented yet — or the trail has gone cold.
+          </p>
+          <a href="../index.html#trips" class="btn btn-ghost">← Back to Trips</a>
+        </div>
+      `;
+    }
+
+    function renderNotConfigured(container) {
+      document.title = 'Setup Required — Loose Itinerary';
+      container.innerHTML = `
+        <div class="trip-not-found">
+          <p class="trip-not-found-text">
+            Add your Supabase credentials in Settings to load your trips.
+          </p>
+          <a href="../index.html" class="btn btn-ghost">← Go to Settings</a>
+        </div>
+      `;
+    }
+
+    // ── Scroll fade-in ────────────────────────────────────────
+
+    function initScrollObserver() {
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+      );
+      document.querySelectorAll('.fade-in:not(.visible)').forEach(el => observer.observe(el));
+    }
+
+    // ── Utilities ─────────────────────────────────────────────
+
+    function formatDateRange(start, end) {
+      if (!start) return '';
+      const opts = { month: 'short', day: 'numeric', year: 'numeric' };
+      const s = new Date(start + 'T12:00:00').toLocaleDateString('en-US', opts);
+      if (!end) return s;
+      const e = new Date(end + 'T12:00:00').toLocaleDateString('en-US', opts);
+      if (s === e) return s;
+      const startYear = new Date(start + 'T12:00:00').getFullYear();
+      const endYear   = new Date(end   + 'T12:00:00').getFullYear();
+      if (startYear === endYear) {
+        const shortOpts = { month: 'short', day: 'numeric' };
+        const ss = new Date(start + 'T12:00:00').toLocaleDateString('en-US', shortOpts);
+        return `${ss} – ${e}`;
+      }
+      return `${s} – ${e}`;
+    }
+
+    function formatFullDate(dateStr) {
+      const opts = { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' };
+      return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', opts);
+    }
+
+    function calcNights(start, end) {
+      if (!start || !end) return 0;
+      const s = new Date(start);
+      const e = new Date(end);
+      return Math.max(0, Math.round((e - s) / (1000 * 60 * 60 * 24)));
+    }
+
+    function hexAdjust(hex, amount) {
+      hex = hex.replace('#', '');
+      if (hex.length === 3) hex = hex.split('').map(c => c+c).join('');
+      let r = parseInt(hex.substring(0, 2), 16);
+      let g = parseInt(hex.substring(2, 4), 16);
+      let b = parseInt(hex.substring(4, 6), 16);
+      r = Math.min(255, Math.max(0, r + amount));
+      g = Math.min(255, Math.max(0, g + amount));
+      b = Math.min(255, Math.max(0, b + amount));
+      return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+    }
+  </script>
+
+</body>
+</html>

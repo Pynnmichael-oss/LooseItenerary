@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="A personal travel memoir and trip planning site. Loose plans, real adventures.">
+  <meta name="theme-color" content="#0f0f0f">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Loose Itinerary">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Loose Itinerary">
+  <meta property="og:description" content="A personal travel memoir. Loose plans, real adventures.">
+  <meta property="og:type" content="website">
+
+  <title>Loose Itinerary</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/globe.css">
+
+  <!-- Mapbox GL JS v3 -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Navigation ── -->
+  <nav class="nav" aria-label="Site navigation">
+    <a href="index.html" class="site-logo" aria-label="Loose Itinerary home">Loose Itinerary</a>
+    <div class="nav-links">
+      <a href="#globe" class="nav-link">Globe</a>
+      <a href="#trips" class="nav-link">Trips</a>
+    </div>
+  </nav>
+
+  <!-- ── Globe Hero ── -->
+  <section id="globe" class="globe-section" aria-label="Interactive world map">
+    <div id="globe-map"></div>
+    <div class="globe-nav-gradient" aria-hidden="true"></div>
+    <div class="globe-bottom-gradient" aria-hidden="true"></div>
+  </section>
+
+  <!-- ── Trips Section ── -->
+  <section id="trips" aria-label="Trips">
+    <h2 class="section-title fade-in">Trips</h2>
+    <div id="trip-grid" class="trip-grid" role="list" aria-label="Trip collection">
+      <!-- Cards rendered by app.js -->
+    </div>
+  </section>
+
+  <!-- ── Settings Button ── -->
+  <button
+    id="settings-btn"
+    class="settings-btn"
+    aria-label="Open settings"
+    title="Settings"
+  >⚙</button>
+
+  <!-- ── Settings Backdrop ── -->
+  <div id="settings-backdrop" class="settings-backdrop" aria-hidden="true"></div>
+
+  <!-- ── Settings Panel ── -->
+  <aside id="settings-panel" class="settings-panel" aria-label="Settings panel" role="dialog" aria-modal="true">
+    <div class="settings-panel-header">
+      <h2 class="settings-panel-title">Settings</h2>
+      <button id="settings-close" class="settings-close-btn" aria-label="Close settings">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="settings-supabase-url">
+        Supabase URL
+        <span class="form-label-note">Stored locally in your browser only</span>
+      </label>
+      <input
+        id="settings-supabase-url"
+        class="form-input"
+        type="url"
+        placeholder="https://your-project.supabase.co"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="settings-supabase-key">
+        Supabase Anon Key
+        <span class="form-label-note">Stored locally in your browser only</span>
+      </label>
+      <input
+        id="settings-supabase-key"
+        class="form-input"
+        type="password"
+        placeholder="eyJ…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+
+    <div style="margin-bottom: var(--space-4);">
+      <button id="settings-test" class="btn btn-ghost btn-sm">Test Connection</button>
+      <div id="settings-connection-status" class="connection-status" aria-live="polite"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="form-group">
+      <label class="form-label" for="settings-mapbox-token">
+        Mapbox Token
+        <span class="form-label-note">Stored locally in your browser only</span>
+      </label>
+      <input
+        id="settings-mapbox-token"
+        class="form-input"
+        type="password"
+        placeholder="pk.eyJ1…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="settings-anthropic-key">
+        Anthropic API Key
+        <span class="form-label-note">Stored locally in your browser only</span>
+      </label>
+      <input
+        id="settings-anthropic-key"
+        class="form-input"
+        type="password"
+        placeholder="sk-ant-…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+
+    <button id="settings-save" class="btn btn-primary btn-full" style="margin-bottom: var(--space-8);">
+      Save Settings
+    </button>
+
+    <hr class="divider">
+
+    <p class="form-label" style="margin-bottom: var(--space-4);">Data</p>
+    <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+      <button id="settings-export" class="btn btn-ghost btn-sm">Export JSON</button>
+      <button id="settings-import" class="btn btn-ghost btn-sm">Import JSON</button>
+    </div>
+    <input type="file" id="settings-import-file" accept=".json" style="display:none" aria-hidden="true">
+  </aside>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ADD TRIP OVERLAY
+       ══════════════════════════════════════════════════════════ -->
+  <div
+    id="add-trip-overlay"
+    class="overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Add new trip"
+  >
+    <div class="overlay-inner">
+      <div class="overlay-header">
+        <h2 class="overlay-title">New Journey</h2>
+        <button id="add-trip-close" class="overlay-close" aria-label="Close">✕</button>
+      </div>
+
+      <form id="add-trip-form" novalidate>
+
+        <!-- Destination -->
+        <p class="form-section-label">Where</p>
+        <div class="form-group">
+          <label class="form-label" for="trip-destination">Destination *</label>
+          <input
+            id="trip-destination"
+            class="form-input"
+            type="text"
+            placeholder="Banff & the Canadian Rockies"
+            required
+            autocomplete="off"
+          >
+          <span class="form-error" id="trip-destination-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="trip-cities">
+            Cities Visited *
+            <span class="form-label-note">Comma-separated — used to place pins on the map</span>
+          </label>
+          <input
+            id="trip-cities"
+            class="form-input"
+            type="text"
+            placeholder="Calgary, Canmore, Banff, Lake Louise"
+            required
+            autocomplete="off"
+          >
+          <span class="form-error" id="trip-cities-error"></span>
+        </div>
+
+        <!-- Dates -->
+        <p class="form-section-label" style="margin-top: var(--space-8);">When</p>
+        <div class="form-row form-group">
+          <div>
+            <label class="form-label" for="trip-start-date">Start Date</label>
+            <input id="trip-start-date" class="form-input" type="date">
+          </div>
+          <div>
+            <label class="form-label" for="trip-end-date">End Date</label>
+            <input id="trip-end-date" class="form-input" type="date">
+          </div>
+        </div>
+
+        <!-- Tagline -->
+        <p class="form-section-label" style="margin-top: var(--space-8);">Story</p>
+        <div class="form-group">
+          <label class="form-label" for="trip-tagline">Tagline</label>
+          <input
+            id="trip-tagline"
+            class="form-input"
+            type="text"
+            placeholder="Ultimate Boys Trip"
+            maxlength="100"
+          >
+        </div>
+
+        <!-- Vibe Tags -->
+        <div class="form-group">
+          <label class="form-label">Vibe</label>
+          <div id="vibe-tag-selector" class="tag-selector"></div>
+          <div class="custom-tag-input-row">
+            <input
+              id="custom-tag-input"
+              class="form-input"
+              type="text"
+              placeholder="Add custom tag…"
+              maxlength="30"
+            >
+            <button type="button" id="custom-tag-add" class="btn btn-ghost btn-sm">Add</button>
+          </div>
+        </div>
+
+        <!-- Cover Photo -->
+        <p class="form-section-label" style="margin-top: var(--space-8);">Cover Photo</p>
+        <div class="form-group">
+          <div id="cover-dropzone" class="photo-dropzone" role="button" tabindex="0" aria-label="Upload cover photo">
+            <input
+              id="cover-file-input"
+              type="file"
+              accept="image/*"
+              aria-label="Select cover photo"
+            >
+            <div class="photo-dropzone-icon">🏔</div>
+            <p class="photo-dropzone-text">Drop a photo or click to browse</p>
+            <p class="photo-dropzone-hint">JPEG, PNG, WEBP — the hero of your trip card</p>
+          </div>
+          <img id="cover-preview" class="photo-preview" alt="Cover photo preview">
+        </div>
+
+        <!-- Cost + Accent -->
+        <p class="form-section-label" style="margin-top: var(--space-8);">Details</p>
+        <div class="form-row form-group">
+          <div>
+            <label class="form-label" for="trip-points">Points Used</label>
+            <input
+              id="trip-points"
+              class="form-input"
+              type="number"
+              min="0"
+              placeholder="0"
+            >
+          </div>
+          <div>
+            <label class="form-label" for="trip-cash">Cash Spent (USD)</label>
+            <input
+              id="trip-cash"
+              class="form-input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="trip-accent-color">Trip Accent Color</label>
+          <input
+            id="trip-accent-color"
+            class="form-input"
+            type="color"
+            value="#c4732a"
+          >
+        </div>
+
+        <!-- Submit -->
+        <div style="margin-top: var(--space-10); display: flex; gap: var(--space-4); align-items: center;">
+          <button id="add-trip-submit" type="submit" class="btn btn-primary" style="flex: 1; padding: var(--space-4);">
+            Add Trip
+          </button>
+          <button type="button" id="add-trip-cancel" class="btn btn-ghost">Cancel</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="assets/js/supabase.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/globe.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/pwa.js"></script>
+
+  <script>
+    // Wire up cancel button and overlay close properly
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('add-trip-cancel')
+        ?.addEventListener('click', () => closeAddTripOverlay());
+    });
+  </script>
+
+</body>
+</html>

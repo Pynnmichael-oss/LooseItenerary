@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="#0f0f0f"/>
+
+  <!-- Compass rose outer ring -->
+  <circle cx="256" cy="256" r="192" fill="none" stroke="#c4732a" stroke-width="2" stroke-opacity="0.2"/>
+  <circle cx="256" cy="256" r="152" fill="none" stroke="#c4732a" stroke-width="1" stroke-opacity="0.12"/>
+
+  <!-- Cardinal tick marks N/S/E/W -->
+  <line x1="256" y1="64" x2="256" y2="90" stroke="#c4732a" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="256" y1="422" x2="256" y2="448" stroke="#c4732a" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="64" y1="256" x2="90" y2="256" stroke="#c4732a" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="422" y1="256" x2="448" y2="256" stroke="#c4732a" stroke-width="3" stroke-opacity="0.6"/>
+
+  <!-- Ordinal ticks -->
+  <line x1="392" y1="120" x2="375" y2="137" stroke="#c4732a" stroke-width="2" stroke-opacity="0.3"/>
+  <line x1="120" y1="120" x2="137" y2="137" stroke="#c4732a" stroke-width="2" stroke-opacity="0.3"/>
+  <line x1="120" y1="392" x2="137" y2="375" stroke="#c4732a" stroke-width="2" stroke-opacity="0.3"/>
+  <line x1="392" y1="392" x2="375" y2="375" stroke="#c4732a" stroke-width="2" stroke-opacity="0.3"/>
+
+  <!-- N label -->
+  <text x="256" y="56" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#c4732a" opacity="0.7">N</text>
+
+  <!-- North needle -->
+  <polygon points="256,100 268,220 256,240 244,220" fill="#c4732a"/>
+  <!-- South needle -->
+  <polygon points="256,412 244,292 256,272 268,292" fill="#c4732a" opacity="0.3"/>
+
+  <!-- East needle small -->
+  <polygon points="412,256 292,268 272,256 292,244" fill="#c4732a" opacity="0.25"/>
+  <!-- West needle small -->
+  <polygon points="100,256 220,244 240,256 220,268" fill="#c4732a" opacity="0.25"/>
+
+  <!-- Center circle -->
+  <circle cx="256" cy="256" r="20" fill="#0f0f0f" stroke="#c4732a" stroke-width="3"/>
+  <circle cx="256" cy="256" r="8" fill="#c4732a"/>
+
+  <!-- Monogram "LI" -->
+  <text x="256" y="478" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="28" fill="#c4732a" opacity="0.45" letter-spacing="8">LI</text>
+</svg>
