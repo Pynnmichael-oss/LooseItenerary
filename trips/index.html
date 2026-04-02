@@ -16,8 +16,6 @@
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/trip.css">
 
-  <!-- Supabase JS v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body class="trip-page">
 
@@ -48,7 +46,10 @@
     </div>
   </main>
 
-  <!-- Scripts -->
+  <!-- CDN scripts at end of body — prevents render-blocking blank screen -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- App scripts -->
   <script src="../assets/js/supabase.js"></script>
   <script src="../assets/js/storage.js"></script>
   <script src="../assets/js/pwa.js"></script>

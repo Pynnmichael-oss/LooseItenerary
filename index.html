@@ -24,12 +24,8 @@
   <link rel="stylesheet" href="assets/css/main.css">
   <link rel="stylesheet" href="assets/css/globe.css">
 
-  <!-- Mapbox GL JS v3 -->
+  <!-- Mapbox GL JS v3 — CSS only in head (non-blocking) -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
-
-  <!-- Supabase JS v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -312,7 +308,11 @@
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- CDN scripts at end of body — prevents render-blocking blank screen -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- App scripts -->
   <script src="assets/js/supabase.js"></script>
   <script src="assets/js/storage.js"></script>
   <script src="assets/js/globe.js"></script>
