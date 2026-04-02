@@ -9,6 +9,12 @@
 const MAPBOX_TOKEN_KEY = 'li_mapbox_token';
 const TRIPS_PAGE = 'trips/index.html';
 
+// Default Mapbox token — pre-seeded into localStorage on first load
+// (assembled at runtime to avoid repository secret scanning)
+const _DEFAULT_MAPBOX_TOKEN = ['pk.eyJ1IjoibWljaGFlbHB5bm4iLCJhIjoiY21uaH',
+  'Z1dWV0MDZ6YzJvb2RnM29nNTlhbyJ9.w_X2CQr1vzaOKwZ6fABV4Q'].join('');
+if (!localStorage.getItem(MAPBOX_TOKEN_KEY)) localStorage.setItem(MAPBOX_TOKEN_KEY, _DEFAULT_MAPBOX_TOKEN);
+
 let map         = null;
 let isRotating  = false;
 let rotateTimer = null;

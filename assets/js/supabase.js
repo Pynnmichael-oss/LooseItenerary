@@ -2,8 +2,8 @@
    LOOSE ITINERARY — supabase.js
    Supabase client initialization and connection utilities.
 
-   Credentials are NEVER hardcoded — they come from localStorage.
-   User enters them in the Settings panel.
+   Default credentials are pre-seeded into localStorage on first load.
+   Can be overridden via the Settings panel at any time.
 
    ──────────────────────────────────────────────────────────────
    SQL SETUP — Run in your Supabase SQL Editor:
@@ -58,6 +58,13 @@
 
 const SUPABASE_URL_KEY  = 'li_supabase_url';
 const SUPABASE_KEY_KEY  = 'li_supabase_anon_key';
+
+// Default credentials — pre-seeded into localStorage on first load
+const _DEFAULT_URL = 'https://tbcsjxaleojlgfreznfi.supabase.co';
+const _DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiY3NqeGFsZW9qbGdmcmV6bmZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTQ3ODksImV4cCI6MjA5MDczMDc4OX0.XJnegJ6gftyCeUUimfhpy23lX8LXZYlc3-1LfiN_tEQ';
+
+if (!localStorage.getItem(SUPABASE_URL_KEY)) localStorage.setItem(SUPABASE_URL_KEY, _DEFAULT_URL);
+if (!localStorage.getItem(SUPABASE_KEY_KEY)) localStorage.setItem(SUPABASE_KEY_KEY, _DEFAULT_KEY);
 
 // Internal client reference — do not access directly outside this module
 let _client = null;
