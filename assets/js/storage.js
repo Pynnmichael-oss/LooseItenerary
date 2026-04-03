@@ -149,6 +149,48 @@ async function getPhotos(tripId) {
   }
 }
 
+/**
+ * deletePhoto(photoId, storagePath)
+ * Remove a photo from Storage and delete its row from the photos table.
+ * Returns { error }
+ */
+async function deletePhoto(photoId, storagePath) {
+  try {
+    const client = getClient();
+    if (storagePath) {
+      await client.storage.from(STORAGE_BUCKET).remove([storagePath]);
+    }
+    const { error } = await client.from('photos').delete().eq('id', photoId);
+    return { error };
+  } catch (err) {
+    return { error: err };
+  }
+}
+
+/**
+ * deleteCoverPhoto(tripId, coverUrl)
+ * Finds the photo row matching coverUrl for tripId, removes it from Storage
+ * and the photos table. Used when replacing a trip's cover photo.
+ */
+async function deleteCoverPhoto(tripId, coverUrl) {
+  try {
+    const client = getClient();
+    const { data: rows } = await client
+      .from('photos')
+      .select('id, storage_path')
+      .eq('trip_id', tripId)
+      .eq('public_url', coverUrl)
+      .limit(1);
+    if (rows && rows.length > 0) {
+      const { id, storage_path } = rows[0];
+      if (storage_path) await client.storage.from(STORAGE_BUCKET).remove([storage_path]);
+      await client.from('photos').delete().eq('id', id);
+    }
+  } catch (err) {
+    console.warn('[Storage] deleteCoverPhoto failed:', err.message);
+  }
+}
+
 // ── Import / Export ──────────────────────────────────────────
 
 /**

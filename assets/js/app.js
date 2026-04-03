@@ -26,6 +26,7 @@ const PRESET_VIBE_TAGS = [
 let allTrips        = [];
 let selectedVibes   = new Set();
 let coverPhotoFile  = null;
+let editingTrip     = null;   // non-null when overlay is in edit mode
 
 /* ══════════════════════════════════════════════════════════════
    INIT
@@ -35,6 +36,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   initScrollObserver();
   initSettingsPanel();
   initAddTripOverlay();
+  // Close card menus when clicking elsewhere
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.trip-card-menu-dropdown').forEach(d => d.hidden = true);
+    document.querySelectorAll('.trip-card-menu-btn.active').forEach(b => b.classList.remove('active'));
+  });
   await loadAndRenderTrips();
   initGlobeSection();
   await maybeSeedData();
@@ -281,42 +287,97 @@ function createTripCard(trip) {
   card.setAttribute('role', 'button');
   card.setAttribute('tabindex', '0');
   card.setAttribute('aria-label', `View trip: ${trip.destination}`);
+  card.dataset.slug = trip.slug;
 
   const accent = trip.accent_color || '#c4732a';
 
-  // Cover image or gradient placeholder
   const coverHtml = trip.cover_photo_url
     ? `<img class="trip-card-cover" src="${trip.cover_photo_url}" alt="${trip.destination}" loading="lazy">`
     : `<div class="trip-card-cover-placeholder" style="background: linear-gradient(135deg, ${hexAdjust(accent, -30)} 0%, ${accent} 60%, ${hexAdjust(accent, 20)} 100%);">${trip.destination.charAt(0)}</div>`;
 
   const dateStr = formatDateRange(trip.start_date, trip.end_date);
-
   const tagHtml = (trip.vibe_tags || []).slice(0, 3).map(t =>
     `<span class="vibe-tag">${t}</span>`
   ).join('');
 
   card.innerHTML = `
+    <button class="trip-card-menu-btn" aria-label="Trip options" title="Options">•••</button>
+    <div class="trip-card-menu-dropdown" hidden>
+      <button class="trip-card-menu-item" data-action="edit">✏ Edit Trip</button>
+      <button class="trip-card-menu-item trip-card-menu-danger" data-action="delete">🗑 Delete Trip</button>
+    </div>
     <div class="trip-card-cover-wrap">
       ${coverHtml}
+      ${trip.tagline ? `<div class="trip-card-tagline-overlay">${trip.tagline}</div>` : ''}
     </div>
-    <div class="trip-card-body">
-      <h3 class="trip-card-destination">${trip.destination}</h3>
-      <p class="trip-card-dates">${dateStr}</p>
-      ${trip.tagline ? `<p class="trip-card-tagline">${trip.tagline}</p>` : ''}
-      <div class="trip-card-footer">
-        <div class="vibe-tags">${tagHtml}</div>
+    <div class="trip-card-info">
+      <div>
+        <h3 class="trip-card-destination">${trip.destination}</h3>
+        <p class="trip-card-dates">${dateStr}</p>
       </div>
+      <div class="vibe-tags">${tagHtml}</div>
     </div>
   `;
 
-  card.addEventListener('click', () => {
+  // Navigate on card click — not when menu is involved
+  card.addEventListener('click', e => {
+    if (e.target.closest('.trip-card-menu-btn') || e.target.closest('.trip-card-menu-dropdown')) return;
     window.location.href = `${TRIPS_PAGE}#${trip.slug}`;
   });
   card.addEventListener('keydown', e => {
     if (e.key === 'Enter') window.location.href = `${TRIPS_PAGE}#${trip.slug}`;
   });
 
+  // ••• menu toggle
+  const menuBtn  = card.querySelector('.trip-card-menu-btn');
+  const menuDrop = card.querySelector('.trip-card-menu-dropdown');
+  menuBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const wasOpen = !menuDrop.hidden;
+    // Close all others first
+    document.querySelectorAll('.trip-card-menu-dropdown').forEach(d => d.hidden = true);
+    document.querySelectorAll('.trip-card-menu-btn.active').forEach(b => b.classList.remove('active'));
+    if (!wasOpen) {
+      menuDrop.hidden = false;
+      menuBtn.classList.add('active');
+    }
+  });
+
+  // Menu actions
+  menuDrop.addEventListener('click', e => {
+    e.stopPropagation();
+    const action = e.target.closest('[data-action]')?.dataset.action;
+    menuDrop.hidden = true;
+    menuBtn.classList.remove('active');
+    if (action === 'edit')   openEditTripOverlay(trip, card);
+    if (action === 'delete') confirmDeleteTripCard(trip, card);
+  });
+
   return card;
+}
+
+function confirmDeleteTripCard(trip, card) {
+  if (!confirm(`Delete "${trip.destination}"? This cannot be undone.`)) return;
+  deleteTrip(trip.slug).then(({ error }) => {
+    if (error) { showToast('Delete failed: ' + error.message, 'error'); return; }
+    card.style.transition = 'opacity 0.3s, transform 0.3s';
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.92)';
+    setTimeout(() => {
+      card.remove();
+      allTrips = allTrips.filter(t => t.slug !== trip.slug);
+      refreshGlobe(allTrips);
+      // Show empty state if no trips left
+      const grid = document.getElementById('trip-grid');
+      if (grid && !grid.querySelector('.trip-card:not(.trip-card-add)')) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state fade-in';
+        empty.innerHTML = `<p class="empty-state-quote">"Every journey starts with a single step — and a one-way ticket."</p>`;
+        grid.appendChild(empty);
+        setTimeout(() => initScrollObserver(), 50);
+      }
+    }, 300);
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -361,19 +422,71 @@ function initAddTripOverlay() {
   // Form submit
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    await submitNewTrip();
+    await submitTripForm();
   });
 }
 
 function openAddTripOverlay() {
+  editingTrip = null;
+  document.getElementById('overlay-title').textContent = 'New Journey';
+  document.getElementById('add-trip-submit').textContent = 'Add Trip';
   const overlay = document.getElementById('add-trip-overlay');
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
-  // Focus first input
-  setTimeout(() => {
-    const first = overlay.querySelector('.form-input');
-    if (first) first.focus();
-  }, 400);
+  setTimeout(() => { overlay.querySelector('.form-input')?.focus(); }, 400);
+}
+
+function openEditTripOverlay(trip, cardEl) {
+  editingTrip = trip;
+  editingTrip._cardEl = cardEl; // keep ref to update in place
+
+  // Swap overlay labels
+  document.getElementById('overlay-title').textContent = 'Edit Journey';
+  document.getElementById('add-trip-submit').textContent = 'Save Changes';
+
+  // Pre-fill fields
+  document.getElementById('trip-destination').value = trip.destination || '';
+  document.getElementById('trip-cities').value       = (trip.cities || []).join(', ');
+  document.getElementById('trip-start-date').value   = trip.start_date || '';
+  document.getElementById('trip-end-date').value     = trip.end_date || '';
+  document.getElementById('trip-tagline').value      = trip.tagline || '';
+  document.getElementById('trip-points').value       = trip.points_used || '';
+  document.getElementById('trip-cash').value         = trip.cash_spent || '';
+  document.getElementById('trip-accent-color').value = trip.accent_color || '#c4732a';
+
+  // Pre-select vibe tags — reset first
+  selectedVibes.clear();
+  document.querySelectorAll('.vibe-tag-selectable').forEach(el => el.classList.remove('selected'));
+  (trip.vibe_tags || []).forEach(tag => {
+    selectedVibes.add(tag);
+    const pill = document.querySelector(`.vibe-tag-selectable[data-tag="${tag}"]`);
+    if (pill) {
+      pill.classList.add('selected');
+    } else {
+      // Custom tag not in presets — create it
+      const container = document.getElementById('vibe-tag-selector');
+      const p = document.createElement('span');
+      p.className = 'vibe-tag vibe-tag-selectable selected';
+      p.textContent = tag;
+      p.dataset.tag = tag;
+      p.addEventListener('click', () => toggleVibeTag(tag, p));
+      container.appendChild(p);
+    }
+  });
+
+  // Show current cover as preview
+  const preview = document.getElementById('cover-preview');
+  const dropText = document.querySelector('#cover-dropzone .photo-dropzone-text');
+  if (trip.cover_photo_url && preview) {
+    preview.src = trip.cover_photo_url;
+    preview.classList.add('visible');
+    if (dropText) dropText.textContent = 'Drop to replace cover photo';
+  }
+
+  const overlay = document.getElementById('add-trip-overlay');
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => { overlay.querySelector('.form-input')?.focus(); }, 400);
 }
 
 function closeAddTripOverlay() {
@@ -388,26 +501,23 @@ function resetAddTripForm() {
   if (form) form.reset();
   selectedVibes.clear();
   coverPhotoFile = null;
+  editingTrip    = null;
 
-  // Reset vibe tags
   document.querySelectorAll('.vibe-tag-selectable').forEach(el => el.classList.remove('selected'));
 
-  // Reset photo preview
   const preview = document.getElementById('cover-preview');
-  if (preview) preview.classList.remove('visible');
-  const dropzone = document.getElementById('cover-dropzone');
-  if (dropzone) {
-    const dropText = dropzone.querySelector('.photo-dropzone-text');
-    if (dropText) dropText.textContent = 'Drop a photo or click to browse';
-  }
+  if (preview) { preview.classList.remove('visible'); preview.src = ''; }
+  const dropText = document.querySelector('#cover-dropzone .photo-dropzone-text');
+  if (dropText) dropText.textContent = 'Drop a photo or click to browse';
 
-  // Clear errors
   document.querySelectorAll('.form-error').forEach(el => el.classList.remove('visible'));
   document.querySelectorAll('.form-input.error').forEach(el => el.classList.remove('error'));
 
-  // Reset color picker
   const colorPicker = document.getElementById('trip-accent-color');
   if (colorPicker) colorPicker.value = '#c4732a';
+
+  // Remove any custom tags added during edit session
+  document.querySelectorAll('#vibe-tag-selector .vibe-tag-selectable:not([data-preset])').forEach(el => el.remove());
 }
 
 function initVibeTagSelector() {
@@ -419,6 +529,7 @@ function initVibeTagSelector() {
     pill.className = 'vibe-tag vibe-tag-selectable';
     pill.textContent = tag;
     pill.dataset.tag = tag;
+    pill.dataset.preset = '1';
     pill.addEventListener('click', () => toggleVibeTag(tag, pill));
     container.appendChild(pill);
   });
@@ -482,100 +593,118 @@ function handleCoverPhoto(file) {
   reader.readAsDataURL(file);
 }
 
-async function submitNewTrip() {
+async function submitTripForm() {
   // Validate
   const destination = document.getElementById('trip-destination').value.trim();
   const citiesRaw   = document.getElementById('trip-cities').value.trim();
   let valid = true;
-
-  if (!destination) {
-    showFieldError('trip-destination', 'Destination is required');
-    valid = false;
-  }
-  if (!citiesRaw) {
-    showFieldError('trip-cities', 'At least one city is required for the map');
-    valid = false;
-  }
+  if (!destination) { showFieldError('trip-destination', 'Destination is required'); valid = false; }
+  if (!citiesRaw)   { showFieldError('trip-cities', 'At least one city is required for the map'); valid = false; }
   if (!valid) return;
 
-  // Gather data
-  const startDate  = document.getElementById('trip-start-date').value;
-  const endDate    = document.getElementById('trip-end-date').value;
-  const tagline    = document.getElementById('trip-tagline').value.trim();
-  const pointsUsed = parseInt(document.getElementById('trip-points').value) || 0;
-  const cashSpent  = parseFloat(document.getElementById('trip-cash').value) || 0;
+  const startDate   = document.getElementById('trip-start-date').value;
+  const endDate     = document.getElementById('trip-end-date').value;
+  const tagline     = document.getElementById('trip-tagline').value.trim();
+  const pointsUsed  = parseInt(document.getElementById('trip-points').value) || 0;
+  const cashSpent   = parseFloat(document.getElementById('trip-cash').value) || 0;
   const accentColor = document.getElementById('trip-accent-color').value || '#c4732a';
+  const cities      = citiesRaw.split(',').map(c => c.trim()).filter(Boolean);
 
-  const cities = citiesRaw.split(',').map(c => c.trim()).filter(Boolean);
-  const slug   = generateSlug(destination, startDate);
-
-  const tripData = {
-    slug,
-    destination,
-    cities,
-    start_date:  startDate || null,
-    end_date:    endDate || null,
-    tagline:     tagline || null,
-    vibe_tags:   Array.from(selectedVibes),
-    accent_color: accentColor,
-    points_used:  pointsUsed,
-    cash_spent:   cashSpent,
-    days:      [],
-    highlights: [],
-    tips:       [],
-    spending:   null
-  };
-
-  // Show loading state
   const submitBtn = document.getElementById('add-trip-submit');
   const origText  = submitBtn.textContent;
   submitBtn.disabled = true;
   submitBtn.innerHTML = `<div class="spinner"></div> Saving…`;
 
   try {
-    let coverUrl = null;
+    if (editingTrip) {
+      /* ── EDIT mode ── */
+      const updatedData = {
+        ...editingTrip,
+        destination,
+        cities,
+        start_date:   startDate || null,
+        end_date:     endDate || null,
+        tagline:      tagline || null,
+        vibe_tags:    Array.from(selectedVibes),
+        accent_color: accentColor,
+        points_used:  pointsUsed,
+        cash_spent:   cashSpent,
+      };
+      delete updatedData._cardEl;
 
-    // Save to Supabase if configured
-    if (isConfigured()) {
-      const { data: savedTrip, error: saveError } = await saveTrip(tripData);
-      if (saveError) throw saveError;
-
-      // Upload cover photo if provided
-      if (coverPhotoFile && savedTrip) {
-        const { url, error: uploadErr } = await uploadPhoto(savedTrip.id, coverPhotoFile, '', null);
-        if (!uploadErr && url) {
-          coverUrl = url;
-          await saveTrip({ ...tripData, id: savedTrip.id, cover_photo_url: url });
+      // Replace cover photo if a new one was selected
+      if (coverPhotoFile && isConfigured()) {
+        const { url, error: upErr } = await uploadPhoto(editingTrip.id, coverPhotoFile, '', null);
+        if (!upErr && url) {
+          if (editingTrip.cover_photo_url) {
+            await deleteCoverPhoto(editingTrip.id, editingTrip.cover_photo_url);
+          }
+          updatedData.cover_photo_url = url;
         }
       }
 
-      tripData.id = savedTrip?.id;
+      if (isConfigured()) {
+        const { error } = await saveTrip(updatedData);
+        if (error) throw error;
+      }
+
+      // Update local state
+      const idx = allTrips.findIndex(t => t.slug === editingTrip.slug);
+      if (idx !== -1) allTrips[idx] = updatedData;
+
+      // Replace card in grid
+      if (editingTrip._cardEl) {
+        const newCard = createTripCard(updatedData);
+        newCard.classList.add('pop-in');
+        editingTrip._cardEl.replaceWith(newCard);
+      }
+
+      refreshGlobe(allTrips);
+      closeAddTripOverlay();
+      showToast('Trip updated');
+
+    } else {
+      /* ── NEW trip mode ── */
+      const slug = generateSlug(destination, startDate);
+      const tripData = {
+        slug, destination, cities,
+        start_date:   startDate || null,
+        end_date:     endDate || null,
+        tagline:      tagline || null,
+        vibe_tags:    Array.from(selectedVibes),
+        accent_color: accentColor,
+        points_used:  pointsUsed,
+        cash_spent:   cashSpent,
+        days: [], highlights: [], tips: [], spending: null
+      };
+
+      let coverUrl = null;
+      if (isConfigured()) {
+        const { data: savedTrip, error: saveError } = await saveTrip(tripData);
+        if (saveError) throw saveError;
+
+        if (coverPhotoFile && savedTrip) {
+          const { url, error: upErr } = await uploadPhoto(savedTrip.id, coverPhotoFile, '', null);
+          if (!upErr && url) {
+            coverUrl = url;
+            await saveTrip({ ...tripData, id: savedTrip.id, cover_photo_url: url });
+          }
+        }
+        tripData.id = savedTrip?.id;
+      }
+
+      tripData.cover_photo_url = coverUrl;
+      allTrips.unshift(tripData);
+      closeAddTripOverlay();
+      addTripCardToGrid(tripData);
+      refreshGlobe(allTrips);
+      showToast('Trip added!');
+      setTimeout(() => { window.location.href = `${TRIPS_PAGE}#${slug}`; }, 600);
     }
-
-    tripData.cover_photo_url = coverUrl;
-
-    // Add to local state
-    allTrips.unshift(tripData);
-
-    // Close overlay
-    closeAddTripOverlay();
-
-    // Add card to grid with pop-in
-    addTripCardToGrid(tripData);
-
-    // Update globe
-    refreshGlobe(allTrips);
-
-    showToast('Trip added!');
-
-    // Navigate to new trip page
-    setTimeout(() => {
-      window.location.href = `${TRIPS_PAGE}#${slug}`;
-    }, 600);
 
   } catch (err) {
     console.error('[App] Save trip error:', err);
-    showToast('Could not save trip: ' + err.message, 'error');
+    showToast('Could not save: ' + err.message, 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = origText;

@@ -54,6 +54,9 @@
   <script src="../assets/js/storage.js"></script>
   <script src="../assets/js/pwa.js"></script>
 
+  <!-- Auto-save flash indicator -->
+  <div id="autosave-flash" class="autosave-flash">Saved</div>
+
   <script>
     /* ============================================================
        TRIP PAGE — Hash-routed client-side rendering
@@ -61,6 +64,9 @@
        ============================================================ */
 
     'use strict';
+
+    let _currentTrip = null;
+    let _autoSaveTimer = null;
 
     // ── Init ──────────────────────────────────────────────────
 
@@ -126,50 +132,21 @@
     // ── Render trip ───────────────────────────────────────────
 
     function renderTrip(container, trip, photos) {
-      // Update page title
+      _currentTrip = trip;
       document.title = `${trip.destination} — Loose Itinerary`;
 
-      const accent = trip.accent_color || '#c4732a';
+      const accent  = trip.accent_color || '#c4732a';
       const dateStr = formatDateRange(trip.start_date, trip.end_date);
       const nights  = calcNights(trip.start_date, trip.end_date);
 
-      // Hero image or gradient
       const heroContent = trip.cover_photo_url
         ? `<img class="trip-hero-image" src="${trip.cover_photo_url}" alt="${trip.destination}">`
         : `<div class="trip-hero-placeholder" style="background: linear-gradient(135deg, ${hexAdjust(accent, -30)} 0%, ${accent} 60%, ${hexAdjust(accent, 20)} 100%);">${trip.destination.charAt(0)}</div>`;
 
-      // Vibe tags
-      const tagHtml = (trip.vibe_tags || []).map(t =>
-        `<span class="vibe-tag">${t}</span>`
-      ).join('');
-
-      // Days
-      const daysHtml = (trip.days || []).length > 0
-        ? renderDays(trip.days)
-        : '';
-
-      // Highlights
-      const highlightsHtml = (trip.highlights || []).length > 0
-        ? renderHighlights(trip.highlights)
-        : '';
-
-      // Tips
-      const tipsHtml = (trip.tips || []).length > 0
-        ? renderTips(trip.tips)
-        : '';
-
-      // Photos
-      const photosHtml = photos.length > 0
-        ? renderPhotos(photos)
-        : '';
-
-      // Cities
-      const citiesHtml = (trip.cities || []).map(c =>
-        `<div class="city-item"><span class="city-bullet"></span>${c}</div>`
-      ).join('');
+      const tagHtml = (trip.vibe_tags || []).map(t => `<span class="vibe-tag">${t}</span>`).join('');
 
       container.innerHTML = `
-        <!-- Hero -->
+        <!-- 1. Cinematic header -->
         <div class="trip-hero">
           ${heroContent}
           <div class="trip-hero-overlay"></div>
@@ -190,160 +167,348 @@
           </div>
         </div>
 
-        <!-- Body -->
         <div class="trip-body">
-          <div class="trip-content-grid">
 
-            <!-- Main column -->
-            <div>
-
-              <!-- Photos -->
-              ${photosHtml ? `
-              <div class="trip-section photos-section fade-in">
-                <h2 class="trip-section-heading">Photos</h2>
-                <div class="photos-grid">${photosHtml}</div>
-              </div>` : ''}
-
-              <!-- Highlights -->
-              ${highlightsHtml ? `
-              <div class="trip-section fade-in">
-                <h2 class="trip-section-heading">Highlights</h2>
-                <div class="highlights-list">${highlightsHtml}</div>
-              </div>` : ''}
-
-              <!-- Day by Day -->
-              ${daysHtml ? `
-              <div class="trip-section fade-in">
-                <h2 class="trip-section-heading">Day by Day</h2>
-                <div class="days-list">${daysHtml}</div>
-              </div>` : ''}
-
-              <!-- Tips -->
-              ${tipsHtml ? `
-              <div class="trip-section fade-in">
-                <h2 class="trip-section-heading">Tips for Next Time</h2>
-                <div class="tips-list">${tipsHtml}</div>
-              </div>` : ''}
-
-              <!-- Empty state if no content at all -->
-              ${!highlightsHtml && !daysHtml && !tipsHtml && !photosHtml ? `
-              <div class="trip-section fade-in" style="padding: var(--space-16) 0;">
-                <p style="
-                  font-family: var(--font-heading);
-                  font-style: italic;
-                  font-size: var(--text-2xl);
-                  color: var(--text-muted);
-                  font-weight: 300;
-                ">The story is still being written.</p>
-              </div>` : ''}
-
+          <!-- 2. Photo grid (hero section) -->
+          <div class="trip-section photos-section fade-in" id="photos-section">
+            <div id="photos-masonry" class="photos-masonry">
+              <!-- photos injected by JS below -->
             </div>
-
-            <!-- Sidebar -->
-            <aside class="trip-sidebar">
-
-              <!-- Stats -->
-              ${(trip.cash_spent || trip.points_used || nights > 0) ? `
-              <div class="sidebar-card fade-in">
-                <h3 class="sidebar-card-title">The Numbers</h3>
-                <div class="stats-grid">
-                  ${nights > 0 ? `
-                  <div class="stat-item">
-                    <div class="stat-value">${nights}</div>
-                    <div class="stat-label">Nights</div>
-                  </div>` : ''}
-                  ${trip.cash_spent ? `
-                  <div class="stat-item">
-                    <div class="stat-value">$${Number(trip.cash_spent).toLocaleString()}</div>
-                    <div class="stat-label">Cash</div>
-                  </div>` : ''}
-                  ${trip.points_used ? `
-                  <div class="stat-item">
-                    <div class="stat-value">${Number(trip.points_used).toLocaleString()}</div>
-                    <div class="stat-label">Points</div>
-                  </div>` : ''}
-                  ${(trip.cities || []).length > 0 ? `
-                  <div class="stat-item">
-                    <div class="stat-value">${trip.cities.length}</div>
-                    <div class="stat-label">Cities</div>
-                  </div>` : ''}
-                </div>
-              </div>` : ''}
-
-              <!-- Cities -->
-              ${(trip.cities || []).length > 0 ? `
-              <div class="sidebar-card fade-in">
-                <h3 class="sidebar-card-title">Cities Visited</h3>
-                <div class="cities-list">${citiesHtml}</div>
-              </div>` : ''}
-
-              <!-- Actions -->
-              <div class="sidebar-card fade-in">
-                <h3 class="sidebar-card-title">Actions</h3>
-                <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-                  <a href="../index.html#trips" class="btn btn-ghost btn-sm">← Back to All Trips</a>
-                  <button class="btn btn-danger btn-sm" id="delete-trip-btn">Delete Trip</button>
-                </div>
-              </div>
-
-            </aside>
           </div>
+
+          <!-- 3. Details accordion -->
+          <div class="trip-details-accordion fade-in" id="details-accordion">
+            <button class="trip-details-toggle" id="details-toggle">
+              <span>Details &amp; Stats</span>
+              <span class="accordion-arrow">↓</span>
+            </button>
+            <div class="trip-details-body" id="details-body" hidden>
+              <div class="stats-grid" style="margin-bottom: var(--space-5);">
+                ${nights > 0 ? `<div class="stat-item"><div class="stat-value">${nights}</div><div class="stat-label">Nights</div></div>` : ''}
+                ${trip.cash_spent ? `<div class="stat-item"><div class="stat-value">$${Number(trip.cash_spent).toLocaleString()}</div><div class="stat-label">Cash</div></div>` : ''}
+                ${trip.points_used ? `<div class="stat-item"><div class="stat-value">${Number(trip.points_used).toLocaleString()}</div><div class="stat-label">Points</div></div>` : ''}
+                ${(trip.cities||[]).length ? `<div class="stat-item"><div class="stat-value">${trip.cities.length}</div><div class="stat-label">Cities</div></div>` : ''}
+              </div>
+              ${(trip.cities||[]).length ? `
+              <div class="cities-list">
+                ${trip.cities.map(c => `<div class="city-item"><span class="city-bullet"></span>${c}</div>`).join('')}
+              </div>` : ''}
+            </div>
+          </div>
+
+          <!-- 4. Day timeline -->
+          ${(trip.days||[]).length ? `
+          <div class="trip-section fade-in">
+            <h2 class="trip-section-heading">Day by Day</h2>
+            <div class="days-list" id="days-list">
+              ${renderDays(trip.days)}
+            </div>
+          </div>` : ''}
+
+          <!-- 5. Highlights -->
+          ${(trip.highlights||[]).length ? `
+          <div class="trip-section fade-in">
+            <h2 class="trip-section-heading">Highlights</h2>
+            <div class="highlights-list" id="highlights-list">
+              ${renderHighlights(trip.highlights)}
+            </div>
+          </div>` : ''}
+
+          <!-- 6. Tips -->
+          ${(trip.tips||[]).length ? `
+          <div class="trip-section fade-in">
+            <h2 class="trip-section-heading">Tips for Next Time</h2>
+            <div class="tips-list" id="tips-list">
+              ${renderTips(trip.tips)}
+            </div>
+          </div>` : ''}
+
+          <!-- Delete -->
+          <div style="margin-top: var(--space-12); padding-bottom: var(--space-8);">
+            <button class="btn btn-danger btn-sm" id="delete-trip-btn">Delete Trip</button>
+          </div>
+
         </div>
       `;
 
-      // Wire up delete
+      // Inject photos into masonry
+      renderMasonryPhotos(photos, trip);
+
+      // Accordion toggle
+      const accordion = document.getElementById('details-accordion');
+      const toggleBtn = document.getElementById('details-toggle');
+      const body      = document.getElementById('details-body');
+      toggleBtn.addEventListener('click', () => {
+        const isOpen = !body.hidden;
+        body.hidden = isOpen;
+        accordion.classList.toggle('open', !isOpen);
+      });
+
+      // Delete trip
       document.getElementById('delete-trip-btn')?.addEventListener('click', async () => {
         if (!confirm(`Delete "${trip.destination}"? This cannot be undone.`)) return;
         const { error } = await deleteTrip(trip.slug);
+        if (!error) window.location.href = '../index.html#trips';
+        else alert('Could not delete: ' + error.message);
+      });
+
+      // Inline editing
+      initInlineEditing(trip);
+      initScrollObserver();
+    }
+
+    // ── Photo masonry ─────────────────────────────────────────
+
+    function renderMasonryPhotos(photos, trip) {
+      const container = document.getElementById('photos-masonry');
+      if (!container) return;
+      container.innerHTML = '';
+
+      // Existing photos
+      photos.forEach(photo => {
+        container.appendChild(createPhotoItem(photo, trip));
+      });
+
+      // Upload "+" card (always last)
+      container.appendChild(createUploadCard(trip, photos));
+
+      // Show empty state if no photos
+      if (photos.length === 0) {
+        const section = document.getElementById('photos-section');
+        if (section) {
+          const empty = document.createElement('div');
+          empty.className = 'photos-empty';
+          empty.innerHTML = `
+            <input type="file" accept="image/*" multiple aria-label="Upload photos">
+            <p class="photos-empty-text">Drop your photos here — this trip deserves to be seen</p>
+          `;
+          empty.querySelector('input').addEventListener('change', e => {
+            handlePhotoUpload(Array.from(e.target.files), trip);
+          });
+          // Replace masonry with empty state initially
+          container.before(empty);
+          container.style.display = 'none';
+        }
+      }
+    }
+
+    function createPhotoItem(photo, trip) {
+      const item = document.createElement('div');
+      item.className = 'photo-masonry-item';
+      item.dataset.photoId = photo.id;
+
+      item.innerHTML = `
+        <img src="${photo.public_url}" alt="${photo.caption || 'Trip photo'}" loading="lazy">
+        <button class="photo-delete-btn" title="Delete photo" aria-label="Delete photo">✕</button>
+        <div class="photo-caption">
+          <span class="photo-caption-editable" contenteditable="true" spellcheck="false"
+                data-photo-id="${photo.id}">${photo.caption || ''}</span>
+        </div>
+      `;
+
+      // Show caption on hover (always show overlay if editable)
+      const caption = item.querySelector('.photo-caption');
+      item.addEventListener('mouseenter', () => caption.style.opacity = '1');
+      item.addEventListener('mouseleave', () => { if (document.activeElement !== caption.querySelector('.photo-caption-editable')) caption.style.opacity = ''; });
+
+      // Inline caption save on blur
+      const captionEl = item.querySelector('.photo-caption-editable');
+      captionEl.addEventListener('blur', async () => {
+        const newCaption = captionEl.textContent.trim();
+        if (newCaption !== (photo.caption || '')) {
+          photo.caption = newCaption;
+          try {
+            const client = getClient();
+            await client.from('photos').update({ caption: newCaption }).eq('id', photo.id);
+            showAutoSaveFlash();
+          } catch (e) { console.warn('[Trip] Caption save failed', e); }
+        }
+      });
+      captionEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); captionEl.blur(); } });
+
+      // Delete photo
+      item.querySelector('.photo-delete-btn').addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Remove this photo?')) return;
+        const { error } = await deletePhoto(photo.id, photo.storage_path);
         if (!error) {
-          window.location.href = '../index.html#trips';
-        } else {
-          alert('Could not delete trip: ' + error.message);
+          item.style.transition = 'opacity 0.3s';
+          item.style.opacity = '0';
+          setTimeout(() => item.remove(), 300);
         }
       });
 
-      // Init scroll observer for fade-ins
-      initScrollObserver();
+      return item;
+    }
+
+    function createUploadCard(trip, existingPhotos) {
+      const card = document.createElement('div');
+      card.className = 'photo-upload-card';
+      card.innerHTML = `
+        <input type="file" accept="image/*" multiple aria-label="Add photos">
+        <div class="photo-upload-icon">+</div>
+        <p class="photo-upload-label">Add photos</p>
+      `;
+      card.querySelector('input').addEventListener('change', e => {
+        handlePhotoUpload(Array.from(e.target.files), trip);
+        e.target.value = '';
+      });
+      // Drag over
+      card.addEventListener('dragover', e => { e.preventDefault(); card.style.borderColor = 'var(--accent)'; });
+      card.addEventListener('dragleave', () => card.style.borderColor = '');
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.style.borderColor = '';
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length) handlePhotoUpload(files, trip);
+      });
+      return card;
+    }
+
+    async function handlePhotoUpload(files, trip) {
+      // Hide empty state if present
+      const emptyEl = document.querySelector('.photos-empty');
+      const masonry = document.getElementById('photos-masonry');
+      if (emptyEl) { emptyEl.remove(); masonry.style.display = ''; }
+
+      for (const file of files) {
+        // Create optimistic placeholder
+        const placeholder = document.createElement('div');
+        placeholder.className = 'photo-masonry-item';
+        placeholder.style.background = 'var(--bg-card)';
+        placeholder.style.minHeight = '160px';
+        placeholder.style.display = 'flex';
+        placeholder.style.alignItems = 'center';
+        placeholder.style.justifyContent = 'center';
+        placeholder.innerHTML = `<div class="spinner"></div>`;
+        // Insert before upload card
+        const uploadCard = masonry.querySelector('.photo-upload-card');
+        masonry.insertBefore(placeholder, uploadCard);
+
+        const { url, error } = await uploadPhoto(trip.id, file, '', null);
+        if (!error && url) {
+          // Fetch the photo row we just inserted
+          const client = getClient();
+          const { data: newPhoto } = await client.from('photos')
+            .select('*').eq('public_url', url).single();
+          if (newPhoto) {
+            const photoItem = createPhotoItem(newPhoto, trip);
+            photoItem.classList.add('pop-in');
+            placeholder.replaceWith(photoItem);
+          } else {
+            placeholder.remove();
+          }
+        } else {
+          placeholder.remove();
+          console.error('[Trip] Upload failed', error);
+        }
+      }
+    }
+
+    // ── Inline editing ────────────────────────────────────────
+
+    function initInlineEditing(trip) {
+      // Days
+      document.querySelectorAll('[data-editable="day-title"]').forEach(el => {
+        makeInlineEditable(el, async () => {
+          const idx = parseInt(el.dataset.dayIndex);
+          if (trip.days && trip.days[idx]) {
+            trip.days[idx].title = el.textContent.trim();
+            scheduleAutoSave(trip);
+          }
+        });
+      });
+      document.querySelectorAll('[data-editable="day-summary"]').forEach(el => {
+        makeInlineEditable(el, async () => {
+          const idx = parseInt(el.dataset.dayIndex);
+          if (trip.days && trip.days[idx]) {
+            trip.days[idx].summary = el.textContent.trim();
+            scheduleAutoSave(trip);
+          }
+        });
+      });
+
+      // Highlights
+      document.querySelectorAll('[data-editable="highlight"]').forEach(el => {
+        makeInlineEditable(el, async () => {
+          const idx = parseInt(el.dataset.index);
+          if (trip.highlights) {
+            trip.highlights[idx] = el.textContent.trim();
+            scheduleAutoSave(trip);
+          }
+        });
+      });
+
+      // Tips
+      document.querySelectorAll('[data-editable="tip"]').forEach(el => {
+        makeInlineEditable(el, async () => {
+          const idx = parseInt(el.dataset.index);
+          if (trip.tips) {
+            trip.tips[idx] = el.textContent.trim();
+            scheduleAutoSave(trip);
+          }
+        });
+      });
+    }
+
+    function makeInlineEditable(el, onSave) {
+      el.contentEditable = 'true';
+      el.spellcheck = false;
+      el.classList.add('editable');
+      el.addEventListener('blur', onSave);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+      });
+    }
+
+    function scheduleAutoSave(trip) {
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = setTimeout(async () => {
+        try {
+          await saveTrip(trip);
+          showAutoSaveFlash();
+        } catch (e) {
+          console.warn('[Trip] Auto-save failed', e);
+        }
+      }, 1500);
+    }
+
+    function showAutoSaveFlash() {
+      const el = document.getElementById('autosave-flash');
+      if (!el) return;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
     }
 
     // ── Sub-renderers ─────────────────────────────────────────
 
     function renderDays(days) {
-      return days.map(day => `
+      return days.map((day, i) => `
         <div class="day-item">
           <div class="day-marker">D${day.index + 1}</div>
           <div class="day-content">
             ${day.date ? `<div class="day-date">${formatFullDate(day.date)}</div>` : ''}
-            <h3 class="day-title">${day.title}</h3>
-            <p class="day-summary">${day.summary}</p>
+            <h3 class="day-title" data-editable="day-title" data-day-index="${i}">${day.title}</h3>
+            <p class="day-summary" data-editable="day-summary" data-day-index="${i}">${day.summary}</p>
           </div>
         </div>
       `).join('');
     }
 
     function renderHighlights(highlights) {
-      return highlights.map(h => `
+      return highlights.map((h, i) => `
         <div class="highlight-item">
           <div class="highlight-dot"></div>
-          <p class="highlight-text">${h}</p>
+          <p class="highlight-text" data-editable="highlight" data-index="${i}">${h}</p>
         </div>
       `).join('');
     }
 
     function renderTips(tips) {
-      return tips.map(tip => `
+      return tips.map((tip, i) => `
         <div class="tip-item">
           <span class="tip-icon">→</span>
-          <p class="tip-text">${tip}</p>
-        </div>
-      `).join('');
-    }
-
-    function renderPhotos(photos) {
-      return photos.map(photo => `
-        <div class="photo-item">
-          <img src="${photo.public_url}" alt="${photo.caption || 'Trip photo'}" loading="lazy">
-          ${photo.caption ? `<div class="photo-caption">${photo.caption}</div>` : ''}
+          <p class="tip-text" data-editable="tip" data-index="${i}">${tip}</p>
         </div>
       `).join('');
     }

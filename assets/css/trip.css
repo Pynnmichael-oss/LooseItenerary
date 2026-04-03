@@ -402,38 +402,39 @@
   flex-shrink: 0;
 }
 
-/* ── Trip Photos Grid ── */
+/* ── Masonry Photo Grid ── */
 .photos-section {
   margin-bottom: var(--space-12);
 }
 
-.photos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-3);
+/* CSS columns masonry — 3 col desktop, 2 tablet, 1 mobile */
+.photos-masonry {
+  columns: 3;
+  column-gap: var(--space-3);
 }
 
-.photo-item {
+.photo-masonry-item {
+  break-inside: avoid;
+  margin-bottom: var(--space-3);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  aspect-ratio: 4/3;
+  position: relative;
   cursor: pointer;
   background: var(--bg-card);
-  position: relative;
-}
-
-.photo-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--transition-slow);
   display: block;
 }
 
-.photo-item:hover img {
-  transform: scale(1.06);
+.photo-masonry-item img {
+  width: 100%;
+  display: block;
+  transition: transform var(--transition-slow);
 }
 
+.photo-masonry-item:hover img {
+  transform: scale(1.04);
+}
+
+/* Caption overlay */
 .photo-caption {
   position: absolute;
   bottom: 0;
@@ -447,7 +448,222 @@
   transition: opacity var(--transition-base);
 }
 
-.photo-item:hover .photo-caption {
+.photo-masonry-item:hover .photo-caption {
+  opacity: 1;
+}
+
+/* Editable caption */
+.photo-caption-editable {
+  cursor: text;
+  font-style: italic;
+  outline: none;
+  min-height: 1em;
+}
+
+.photo-caption-editable:focus {
+  background: rgba(0,0,0,0.6);
+  opacity: 1;
+}
+
+/* Trash icon on photo hover */
+.photo-delete-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-base), background var(--transition-fast);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.photo-masonry-item:hover .photo-delete-btn {
+  opacity: 1;
+}
+
+.photo-delete-btn:hover {
+  background: rgba(208,64,64,0.75);
+}
+
+/* Photo upload card in masonry */
+.photo-upload-card {
+  border: 2px dashed var(--border-accent);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 140px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  break-inside: avoid;
+  margin-bottom: var(--space-3);
+}
+
+.photo-upload-card:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.photo-upload-card input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.photo-upload-icon {
+  font-size: 1.6rem;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.photo-upload-label {
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* Photos empty state */
+.photos-empty {
+  width: 100%;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-6);
+  cursor: pointer;
+  transition: border-color var(--transition-base), background var(--transition-base);
+  position: relative;
+}
+
+.photos-empty:hover {
+  border-color: var(--border-accent);
+  background: var(--accent-dim);
+}
+
+.photos-empty input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.photos-empty-text {
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: var(--text-xl);
+  color: var(--text-muted);
+  font-weight: 300;
+  pointer-events: none;
+}
+
+/* ── Details Accordion ── */
+.trip-details-accordion {
+  margin-bottom: var(--space-10);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.trip-details-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  transition: color var(--transition-base), background var(--transition-base);
+}
+
+.trip-details-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.accordion-arrow {
+  transition: transform var(--transition-base);
+  font-style: normal;
+}
+
+.trip-details-accordion.open .accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.trip-details-body {
+  padding: var(--space-6);
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  animation: accordionOpen 0.25s ease;
+}
+
+@keyframes accordionOpen {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Inline Editing ── */
+.editable {
+  cursor: text;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+}
+
+.editable:hover {
+  background: rgba(245, 240, 232, 0.04);
+}
+
+.editable:focus {
+  background: rgba(245, 240, 232, 0.06);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+/* ── Auto-save flash ── */
+.autosave-flash {
+  position: fixed;
+  top: calc(var(--nav-height) + var(--space-3));
+  right: var(--space-6);
+  background: rgba(61, 158, 96, 0.12);
+  border: 1px solid var(--success);
+  color: var(--success);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+  transition: opacity 0.3s ease;
+}
+
+.autosave-flash.show {
   opacity: 1;
 }
 
@@ -482,6 +698,10 @@
 }
 
 /* ── Mobile ── */
+@media (max-width: 1024px) {
+  .photos-masonry { columns: 2; }
+}
+
 @media (max-width: 768px) {
   .trip-hero {
     height: 55vh;
@@ -506,9 +726,7 @@
     position: static;
   }
 
-  .photos-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .photos-masonry { columns: 2; }
 
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -524,8 +742,5 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .photos-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-2);
-  }
+  .photos-masonry { columns: 1; }
 }

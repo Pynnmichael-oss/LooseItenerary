@@ -505,13 +505,14 @@ textarea.form-input {
 /* ── Trip Cards ── */
 .trip-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--space-6);
   padding: var(--space-12) var(--space-8);
   max-width: var(--max-width);
   margin: 0 auto;
 }
 
+/* Portrait 3:4 film-photo card */
 .trip-card {
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -519,8 +520,11 @@ textarea.form-input {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
   cursor: pointer;
-  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 3 / 4;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 
 .trip-card:hover {
@@ -529,12 +533,20 @@ textarea.form-input {
   border-color: var(--border-accent);
 }
 
+/* Cover takes 70% of card height */
+.trip-card-cover-wrap {
+  flex: 7;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
 .trip-card-cover {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   object-fit: cover;
-  transition: transform var(--transition-slow);
   display: block;
+  transition: transform var(--transition-slow);
 }
 
 .trip-card:hover .trip-card-cover {
@@ -543,14 +555,14 @@ textarea.form-input {
 
 .trip-card-cover-placeholder {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-heading);
-  font-size: var(--text-2xl);
+  font-size: var(--text-4xl);
   font-style: italic;
-  color: rgba(245, 240, 232, 0.3);
+  color: rgba(245, 240, 232, 0.25);
   transition: transform var(--transition-slow);
 }
 
@@ -558,21 +570,43 @@ textarea.form-input {
   transform: scale(1.04);
 }
 
-.trip-card-cover-wrap {
-  overflow: hidden;
-  position: relative;
+/* Tagline overlaid on bottom of photo */
+.trip-card-tagline-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-8) var(--space-4) var(--space-3);
+  background: linear-gradient(transparent, rgba(0,0,0,0.72));
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--text-sm);
+  color: rgba(255,255,255,0.82);
+  line-height: 1.4;
+  pointer-events: none;
 }
 
-.trip-card-body {
-  padding: var(--space-5) var(--space-6);
+/* Info strip — 30% */
+.trip-card-info {
+  flex: 3;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
 }
 
 .trip-card-destination {
   font-family: var(--font-heading);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 400;
   margin-bottom: var(--space-1);
   color: var(--text-primary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .trip-card-dates {
@@ -583,23 +617,76 @@ textarea.form-input {
   margin-bottom: var(--space-3);
 }
 
-.trip-card-tagline {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-4);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.trip-card-footer {
+/* ── Trip Card ••• Menu ── */
+.trip-card-menu-btn {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-base), background var(--transition-fast);
+  cursor: pointer;
+}
+
+.trip-card:hover .trip-card-menu-btn,
+.trip-card-menu-btn.active {
+  opacity: 1;
+}
+
+.trip-card-menu-btn:hover {
+  background: rgba(0,0,0,0.8);
+}
+
+.trip-card-menu-dropdown {
+  position: absolute;
+  top: calc(var(--space-3) + 32px);
+  right: var(--space-3);
+  z-index: 50;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  min-width: 148px;
+  box-shadow: var(--shadow-lg);
+}
+
+.trip-card-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.trip-card-menu-item:hover {
+  background: rgba(245,240,232,0.06);
+  color: var(--text-primary);
+}
+
+.trip-card-menu-danger {
+  color: var(--error);
+}
+
+.trip-card-menu-danger:hover {
+  background: rgba(208,64,64,0.1);
+  color: var(--error);
 }
 
 /* Add Trip Card */
@@ -611,7 +698,7 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  min-height: 280px;
+  aspect-ratio: 3 / 4;
   transition: all var(--transition-base);
 }
 
