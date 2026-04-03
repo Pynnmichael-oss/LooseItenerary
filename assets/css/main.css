@@ -698,7 +698,7 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 3 / 2;
   transition: all var(--transition-base);
 }
 
